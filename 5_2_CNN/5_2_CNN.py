@@ -86,6 +86,7 @@ for i in range(20000):
     train_step.run(feed_dict={x:batch[0], y_:batch[1], keep_prob:0.5})
 
 # the result in test dataset
+# in order to avoid memory alloc error, split whole test image into several batches
 test_accuracy = 0
 
 for i in range(10):
