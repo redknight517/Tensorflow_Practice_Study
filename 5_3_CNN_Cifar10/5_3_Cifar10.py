@@ -63,4 +63,56 @@ weight4 = variable_with_weight_loss(shape=[384, 192], stddev=0.04, wl=0.004)
 bias4 = tf.Variable(tf.constant(0.1, shape=[192]))
 local4 = tf.nn.relu(tf.matmul(local3, weight4) + bias4)
 
-# last layer
+# last layer -- avoid to do the softmax
+weight5 = variable_with_weight_loss(shape=[192,10], stddev=1/192.0, wl=0.0)
+bias5 = tf.Variable(tf.constant(0.0, shape=[10]))
+logits = tf.add(tf.matmul(local4, weight5), bias5)
+
+# function to caculate the loss
+def loss(logits, labels):
+    labels = tf.cast(labels, tf.int64)
+    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=labels, name="cross_entropy_per_example")
+    cross_entropy_mean = tf.reduce_mean(cross_entropy, name="cross_entropy")
+    tf.add_to_collection("losses", cross_entropy_mean)
+
+    return tf.add_n(tf.get_collection("losses"), name="total_loss")
+
+loss = loss(logits, label_holder)
+
+# train operation to optimize the whole training process to minimize the loss
+train_op = tf.train.AdamOptimizer(1e-3).minimize(loss)
+
+top_k_op = tf.nn.in_top_k(logits, label_holder, 1)
+
+sess = tf.InteractiveSession()
+tf.global_variables_initializer().run()
+
+tf.train.start_queue_runners()
+
+# start to train
+for step in range(max_steps):
+    start_time = time.time()
+    image_batch, label_batch = sess.run([images_train, labels_train])
+    _, loss_value = sess.run([train_op, loss], feed_dict={image_holder:image_batch, label_holder:label_batch})
+    duration = time.time() - start_time
+    if step % 10 == 0:
+        examples_per_sec = batch_size / duration
+        sec_per_batch = float(duration)
+        format_str = ("step %d, loss=%.2f (%.1f examples/sec; %.3f sec/batch)")
+        print(format_str % (step, loss_value, examples_per_sec, sec_per_batch))
+
+
+num_examples = 10000
+import math
+num_iter = int(math.ceil(num_examples / batch_size))
+true_count = 0
+total_sample_count = num_iter * batch_size
+step = 0
+while step < num_iter:
+    image_batch, label_batch = sess.run([images_test, labels_test])
+    predictions = sess.run([top_k_op], feed_dict={image_holder:image_batch, label_holder:label_batch})
+    true_count += np.sum(predictions)
+    step += 1
+
+prediction = true_count / total_sample_count
+print("precision @ 1 = %.3f" % prediction)
