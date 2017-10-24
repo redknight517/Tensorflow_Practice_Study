@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 import time
 
-max_steps = 3000
+max_steps = 10000
 batch_size = 128
 data_dir = '/tmp/cifar10_data/cifar-10-batches-bin'
 
@@ -28,7 +28,7 @@ images_test, labels_test = cifar10_input.inputs(eval_data=True, data_dir=data_di
 
 # Placeholder for image and label
 image_holder = tf.placeholder(tf.float32, [batch_size, 24, 24, 3])
-label_holder = tf.placeholder(tf.float32, [batch_size])
+label_holder = tf.placeholder(tf.int32, [batch_size])
 
 # first CNN layer
 
@@ -54,7 +54,7 @@ pool2 = tf.nn.max_pool(norm2, ksize=[1,3,3,1], strides=[1,2,2,1], padding='SAME'
 # first full connect layer
 reshape = tf.reshape(pool2, [batch_size, -1])
 dim = reshape.get_shape()[1].value
-weight3 = variable_with_weight_loss(shape[dim,384], stddev=0.04, wl=0.004)
+weight3 = variable_with_weight_loss(shape=[dim,384], stddev=0.04, wl=0.004)
 bias3 = tf.Variable(tf.constant(0.1, shape=[384]))
 local3 = tf.nn.relu(tf.matmul(reshape, weight3) + bias3)
 
@@ -81,6 +81,7 @@ loss = loss(logits, label_holder)
 
 # train operation to optimize the whole training process to minimize the loss
 train_op = tf.train.AdamOptimizer(1e-3).minimize(loss)
+#train_op = tf.train.GradientDescentOptimizer(1e-2).minimize(loss)
 
 top_k_op = tf.nn.in_top_k(logits, label_holder, 1)
 
