@@ -1,4 +1,4 @@
-# benchmark the AlexNet performance
+# benchmark the AlexNet performance without LRN
 
 from datetime import datetime
 import math
@@ -29,9 +29,9 @@ def inference(images):
         parameters += [kernel, biases]
 
     # lrn layer 1
-    lrn1 = tf.nn.lrn(conv1, 4, bias=1.0, alpha=0.001/9, beta=0.75, name='lrn1')
+    #lrn1 = tf.nn.lrn(conv1, 4, bias=1.0, alpha=0.001/9, beta=0.75, name='lrn1')
     # max pool layer 1
-    pool1 = tf.nn.max_pool(lrn1, ksize=[1,3,3,1],strides=[1,2,2,1], padding='VALID', name='pool1')
+    pool1 = tf.nn.max_pool(conv1, ksize=[1,3,3,1],strides=[1,2,2,1], padding='VALID', name='pool1')
     print_activations(pool1)
 
     # CNN layer 2
@@ -45,9 +45,9 @@ def inference(images):
         parameters += [kernel, biases]
 
     # lrn layer 2
-    lrn2 = tf.nn.lrn(conv2, 4, bias=1.0, alpha=0.001/9, beta=0.75, name='lrn2')
+    #lrn2 = tf.nn.lrn(conv2, 4, bias=1.0, alpha=0.001/9, beta=0.75, name='lrn2')
     # max pool layer 2
-    pool2 = tf.nn.max_pool(lrn2, ksize=[1,3,3,1],strides=[1,2,2,1], padding='VALID', name='pool2')
+    pool2 = tf.nn.max_pool(conv2, ksize=[1,3,3,1],strides=[1,2,2,1], padding='VALID', name='pool2')
     print_activations(pool2)
 
     # CNN layer 3
@@ -135,4 +135,3 @@ def run_benchmark():
 
 # Main entrance
 run_benchmark()
-
