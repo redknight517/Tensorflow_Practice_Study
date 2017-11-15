@@ -102,7 +102,7 @@ def time_tensorflow_run(session, target, feed, info_string):
     for i in range(num_batches + num_steps_burn_in):
         start_time = time.time()
         _ = session.run(target, feed_dict=feed)
-        duration = time.time()
+        duration = time.time() - start_time
         if i >= num_steps_burn_in:
             if not i % 10:
                 print('%s: step %d, duration = %.3f' % (datetime.now(), i - num_steps_burn_in, duration))
@@ -135,7 +135,7 @@ def run_benchmark():
 
 
 # main input
-batch_size = 32
+batch_size = 16
 num_batches = 100
 run_benchmark()
 
