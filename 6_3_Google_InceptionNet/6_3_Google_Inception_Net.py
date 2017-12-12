@@ -233,4 +233,84 @@ def inception_v3_base(inputs, scope=None):
             end_points['Mixed_6e'] = net
 
             # Inception Block Three -- 3 inception modules (Mixed_7a/7b/7c)
-            # Mixed_7a --
+            # Mixed_7a -- 8x8x1280
+            with tf.variable_scope('Mixed_7a'):
+                with tf.variable_scope('Branch_0'):
+                    branch_0 = slim.conv2d(net, 192, [1,1], scope='Conv2d_0a_1x1')          # 17x17x768 --> 17x17x192
+                    branch_0 = slim.conv2d(branch_0, 320, [3,3], stride=2,
+                                           padding='VALID', scope='Conv2d_1a_3x3')          # 17x17x192 --> 8x8x320
+                with tf.variable_scope('Branch_1'):
+                    branch_1 = slim.conv2d(net, 192, [1,1], scope='Conv2d_0a_1x1')          # 17x17x768 --> 17x17x192
+                    branch_1 = slim.conv2d(branch_1, 192, [1,7], scope='Conv2d_0b_1x7')     # 17x17x192 --> 17x17x192
+                    branch_1 = slim.conv2d(branch_1, 192, [7,1], scope='Conv2d_0c_7x1')     # 17x17x192 --> 17x17x192
+                    branch_1 = slim.conv2d(branch_1, 192, [3,3], stride=2,
+                                           padding='VALID', scope='Con2d_1a_3x3')           # 17x17x192 --> 8x8x192
+                with tf.variable_scope('Branch_2'):
+                    branch_2 = slim.max_pool2d(net, [3,3], stride=2,
+                                               padding='VALID', scope='MaxPool_1a_3x3')     # 17x17x768 --> 8x8x768
+
+                net = tf.concat([branch_0, branch_1, branch_2], 3)       # 8x8x(320+192+768) = 8x8x1280
+
+            # Mixed_7b -- 8x8x2048
+            with tf.variable_scope('Mixed_7b'):
+                with tf.variable_scope('Branch_0'):
+                    branch_0 = slim.conv2d(net, 320, [1,1], scope='Conv2d_0a_1x1')          # 8x8x1280 --> 8x8x320
+                with tf.variable_scope('Branch_1'):
+                    branch_1 = slim.conv2d(net, 384, [1,1], scope='Conv2d_0a_1x1')          # 8x8x1280 --> 8x8x384
+                    branch_1 = tf.concat([
+                        slim.conv2d(branch_1, 384, [1,3], scope='Conv2d_0b_1x3'),
+                        slim.conv2d(branch_1, 384, [3,1], scope='Conv2d_0b_3x1')], 3)       # 8x8x384  --> 8x8x768
+                with tf.variable_scope('Branch_2'):
+                    branch_2 = slim.conv2d(net, 448, [1,1], scope='Conv2d_0a_1x1')          # 8x8x1280 --> 8x8x448
+                    branch_2 = slim.conv2d(branch_2, 384, [3,3], scope='Conv2d_0b_3x3')     # 8x8x448  --> 8x8x384
+                    branch_2 = tf.concat([
+                        slim.conv2d(branch_2, 384, [1,3], scope='Conv2d_0c_1x3'),
+                        slim.conv2d(branch_2, 384, [3,1], scope='Conv2d_0c_3x1')], 3)       # 8x8x384  --> 8x8x768
+                with tf.variable_scope('Branch_3'):
+                    branch_3 = slim.avg_pool2d(net, [3,3], scope='AvgPool_0a_3x3')          # 8x8x1280 --> 8x8x1280
+                    branch_3 = slim.conv2d(branch_3, 192, [1,1], scope='Conv2d_0b_1x1')     # 8x8x1280 --> 8x8x192
+
+                net = tf.concat([branch_0, branch_1, branch_2, branch_3], 3)       # 8x8x(320+768+768+192) = 8x8x2048
+
+            # Mixed_7c -- 8x8x2048
+            with tf.variable_scope('Mixed_7c'):
+                with tf.variable_scope('Branch_0'):
+                    branch_0 = slim.conv2d(net, 320, [1,1], scope='Conv2d_0a_1x1')          # 8x8x2048 --> 8x8x320
+                with tf.variable_scope('Branch_1'):
+                    branch_1 = slim.conv2d(net, 384, [1,1], scope='Conv2d_0a_1x1')          # 8x8x2048 --> 8x8x384
+                    branch_1 = tf.concat([
+                        slim.conv2d(branch_1, 384, [1,3], scope='Conv2d_0b_1x3'),
+                        slim.conv2d(branch_1, 384, [3,1], scope='Conv2d_0b_3x1')], 3)       # 8x8x384  --> 8x8x768
+                with tf.variable_scope('Branch_2'):
+                    branch_2 = slim.conv2d(net, 448, [1,1], scope='Conv2d_0a_1x1')          # 8x8x2048 --> 8x8x448
+                    branch_2 = slim.conv2d(branch_2, 384, [3,3], scope='Conv2d_0b_3x3')     # 8x8x448  --> 8x8x384
+                    branch_2 = tf.concat([
+                        slim.conv2d(branch_2, 384, [1,3], scope='Conv2d_0c_1x3'),
+                        slim.conv2d(branch_2, 384, [3,1], scope='Conv2d_0c_3x1')], 3)       # 8x8x384  --> 8x8x768
+                with tf.variable_scope('Branch_3'):
+                    branch_3 = slim.avg_pool2d(net, [3,3], scope='AvgPool_0a_3x3')          # 8x8x2048 --> 8x8x2048
+                    branch_3 = slim.conv2d(branch_3, 192, [1,1], scope='Conv2d_0b_1x1')     # 8x8x2048 --> 8x8x192
+
+                net = tf.concat([branch_0, branch_1, branch_2, branch_3], 3)       # 8x8x(320+768+768+192) = 8x8x2048
+
+            return net, end_points
+
+
+# Inception V3 function
+def inception_v3(inputs,
+                 num_classes=1000,
+                 is_training=True,
+                 dropout_keep_prob=0.8,
+                 prediction_fn=slim.softmax,
+                 spatial_squeeze=True,
+                 reuse=None,
+                 scope='InceptionV3'):
+
+    with tf.variable_scope(scope, 'InceptionV3', [inputs, num_classes], reuse=reuse) as scope:
+
+        with slim.arg_scope([slim.batch_norm, slim.dropout], is_training=is_training):
+
+            net, end_points = inception_v3_base(inputs, scope=scope)
+
+
+
