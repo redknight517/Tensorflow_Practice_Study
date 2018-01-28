@@ -24,7 +24,7 @@ def inception_v3_arg_scope(weight_decay=0.00004,
     }
 
     with slim.arg_scope([slim.conv2d, slim.fully_connected],
-                        weight_regularizer=slim.l2_regularizer(weight_decay)):
+                        weights_regularizer=slim.l2_regularizer(weight_decay)):
         with slim.arg_scope(
                 [slim.conv2d],
                 weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
@@ -311,6 +311,82 @@ def inception_v3(inputs,
         with slim.arg_scope([slim.batch_norm, slim.dropout], is_training=is_training):
 
             net, end_points = inception_v3_base(inputs, scope=scope)
+
+            # Auxiliary Logits
+            with slim.arg_scope([slim.conv2d, slim.max_pool2d, slim.avg_pool2d], stride=1, padding='SAME'):
+                aux_logits = end_points['Mixed_6e']
+                with tf.variable_scope('AuxLogits'):
+                    aux_logits = slim.avg_pool2d(aux_logits, [5,5], stride=3, padding='VALID', scope='AvgPool_1a_5x5')  # 17x17x768 --> 5x5x768
+                    aux_logits = slim.conv2d(aux_logits, 128, [1,1], scope='Conv2d_1b_1x1')                             # 5x5x768   --> 5x5x128
+                    aux_logits = slim.conv2d(aux_logits, 768, [5,5], weights_initializer=trunc_normal(0.01),
+                                             padding='VALID', scope='Conv2d_2a_5x5')                                    # 5x5x128   --> 1x1x768
+                    aux_logits = slim.conv2d(aux_logits, num_classes, [1,1], activation_fn=None,
+                                             normalizer_fn=None, weights_initializer=trunc_normal(0.001),
+                                             scope='Conv2d_2b_1x1')                                                     # 1x1x768   --> 1x1x1000
+                    if spatial_squeeze:
+                        aux_logits = tf.squeeze(aux_logits, [1,2], name='SpatialSqueeze')                               # 1x1x1000  --> 1000
+
+                    end_points['AuxLogits'] = aux_logits
+
+
+            # Normal Logits
+            with tf.variable_scope('Logits'):
+                net = slim.avg_pool2d(net, [8,8], padding='VALID', scope='AvgPool_1a_8x8')
+                net = slim.dropout(net, keep_prob=dropout_keep_prob, scope='Dropout_1b')
+                end_points['PreLogits'] = net
+
+                logits = slim.conv2d(net, num_classes, [1,1], activation_fn=None, normalizer_fn=None,
+                                     scope='Conv2d_1c_1x1')
+
+                if spatial_squeeze:
+                    logits = tf.squeeze(logits, [1,2], name='SpatialSqueeze')
+
+            end_points['Logits'] = logits
+
+            end_points['PreLogits'] = prediction_fn(logits, scope='Predictions')
+
+    return logits, end_points
+
+
+from datetime import datetime
+import math
+import time
+
+
+def time_tensorflow_run(session, target, info_string):
+    num_steps_burn_in = 10
+    total_duration = 0.0
+    total_duration_squared = 0.0
+    for i in range(num_batches + num_steps_burn_in):
+        start_time = time.time()
+        _ = session.run(target)
+        duration = time.time() - start_time
+        if i >= num_steps_burn_in:
+            if not i % 10:
+                print('%s: step %d, duration = %.3f' %
+                      (datetime.now(), i - num_steps_burn_in, duration))
+            total_duration += duration
+            total_duration_squared += duration * duration
+    mn = total_duration / num_batches
+    vr = total_duration_squared / num_batches - mn * mn
+    sd = math.sqrt(vr)
+    print('%s: %s across %d steps, %.3f +/- %.3f sec / batch' %
+          (datetime.now(), info_string, num_batches, mn, sd))
+
+
+batch_size = 32
+height, width = 299, 299
+inputs = tf.random_uniform((batch_size, height, width, 3))
+with slim.arg_scope(inception_v3_arg_scope()):
+    logits, end_points = inception_v3(inputs, is_training=False)
+
+init = tf.global_variables_initializer()
+sess = tf.Session()
+sess.run(init)
+num_batches = 100
+time_tensorflow_run(sess, logits, "Forward")
+
+
 
 
 
